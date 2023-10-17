@@ -12,60 +12,69 @@ mutex cout_mutex;
 #define N 25
 
 // GLOBAL VARIABLES
-counting_semaphore free_chairs(N);
-binary_semaphore barber_free(1);
-binary_semaphore barber_sem(1);
-
-void get_haircut(size_t id)
-{
-    this_thread::sleep_for(chrono::seconds(10));
-    print("Client " << id << " got a haircut");
-}
-
-void cutHair()
-{
-    this_thread::sleep_for(chrono::seconds(10));
-    print("Barber cut hair");
-}
+int customers = 0;
+mutex mutexCustomer;
+counting_semaphore customer(0);
+counting_semaphore barber(0);
+counting_semaphore customerDone(0);
+counting_semaphore barberDone(0);
 
 void client(size_t id)
 {
-    print("Client " << id << " arrived");
-    bool isAChairFree = free_chairs.try_acquire();
-    if (!isAChairFree){
-        print("no chairs available");
-        print("Client " << id << " left");
-        return; //Bye bye  
-    } 
+    // customer enters
+    print("Customer " << id << " enters the barbershop");
+    mutexCustomer.lock();
+    if (customers == N) {
+        mutexCustomer.unlock();
+        print("Customer " << id << " bulks");
+        return;
+    }
+    ++customers;
+    mutexCustomer.unlock();
 
-    //wait for barber    
-    barber_free.acquire();
-    print("Client " << id << " woke the barber up");
-    barber_sem.release();
-    // Get a haircut
-    get_haircut(id);
-    // Bye bye;
-    free_chairs.release();
-    print("Client " << id << " left");
+    // rendezvous 1
+    customer.release();         // signal X
+    barber.acquire();           // wait Y
+
+    // getHairCut
+    print("Customer " << id << " get his hair cut");
+    this_thread::sleep_for(chrono::seconds(1));
+    print("Customer " << id << " got a haircut");
+
+    // rendezvous 2
+    customerDone.release();     // signal X'
+    barberDone.acquire();       // wait Y'
+
+    // customer leaves
+    mutexCustomer.lock();
+    --customers;
+    mutexCustomer.unlock();
+    print("Customer " << id << " leaves the barbershop");
 }
 
 void barber()
 {
     while (true) {
-        print("Barber is sleeping");
-        barber_sem.acquire();
-        print("Barber woke up");
-        cutHair();
-        barber_free.release();
+        // rendezvous 1
+        customer.acquire();     // wait X
+        barber.release();       // signal Y
+
+        // cutHair
+        print("Barber starts to cut hair");
+        this_thread::sleep_for(chrono::seconds(1));
+        print("Barber stops to cut hair");
+
+        // rendezvous 2
+        customerDone.acquire(); // wait X'
+        barberDone.release();   // signal Y'
     }
 }
 
 
 int main()
 {
-    barber_sem.acquire();
-    thread barber_thread(barber);
-    print("Client will arrive");
+    print("Barbershop opening with " << N << " chairs");
+    thread barberThread(barberProcedure);
     vector<thread> clients {};
     for(size_t i = 0; i < N+1; ++i)
     {
