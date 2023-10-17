@@ -74,7 +74,10 @@ void attendant()
 int main()
 {
     print("Car wash opening with " << N << " waiting spaces");
+
     thread attendantThread(attendant);
+    attendantThread.detach();
+
     vector<thread> cars {};
     for(size_t i = 0; i < N+1; ++i)
     {
@@ -82,7 +85,6 @@ int main()
         cars.push_back(std::move(t));
     }
 
-    attendantThread.join();
     for (auto &car: cars) {
         car.join();
     }
