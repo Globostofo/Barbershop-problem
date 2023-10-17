@@ -12,79 +12,79 @@ mutex cout_mutex;
 #define N 25
 
 // GLOBAL VARIABLES
-int customers = 0;
-mutex mutexCustomer;
-counting_semaphore customer(0);
-counting_semaphore barber(0);
-counting_semaphore customerDone(0);
-counting_semaphore barberDone(0);
+int carsWaiting = 0;
+mutex mutexCar;
+counting_semaphore carArrived(0);
+counting_semaphore bayFree(0);
+counting_semaphore carWashed(0);
+counting_semaphore washingDone(0);
 
-void client(size_t id)
+void car(size_t id)
 {
-    // customer enters
-    print("Customer " << id << " enters the barbershop");
-    mutexCustomer.lock();
-    if (customers == N) {
-        mutexCustomer.unlock();
-        print("Customer " << id << " bulks");
+    // car arrives
+    print("Car " << id << " arrives at the car wash");
+    mutexCar.lock();
+    if (carsWaiting == N) {
+        mutexCar.unlock();
+        print("Car " << id << " leaves due to no waiting space");
         return;
     }
-    ++customers;
-    mutexCustomer.unlock();
+    ++carsWaiting;
+    mutexCar.unlock();
 
     // rendezvous 1
-    customer.release();         // signal X
-    barber.acquire();           // wait Y
+    carArrived.release();  // signal X
+    bayFree.acquire();     // wait Y
 
-    // getHairCut
-    print("Customer " << id << " get his hair cut");
+    // getCarWash
+    print("Car " << id << " is being washed");
     this_thread::sleep_for(chrono::seconds(1));
-    print("Customer " << id << " got a haircut");
+    print("Car " << id << " is washed");
 
     // rendezvous 2
-    customerDone.release();     // signal X'
-    barberDone.acquire();       // wait Y'
+    carWashed.release();  // signal X'
+    washingDone.acquire(); // wait Y'
 
-    // customer leaves
-    mutexCustomer.lock();
-    --customers;
-    mutexCustomer.unlock();
-    print("Customer " << id << " leaves the barbershop");
+    // car leaves
+    mutexCar.lock();
+    --carsWaiting;
+    mutexCar.unlock();
+    print("Car " << id << " leaves the car wash");
 }
 
-void barber()
+void attendant()
 {
     while (true) {
         // rendezvous 1
-        customer.acquire();     // wait X
-        barber.release();       // signal Y
+        carArrived.acquire();  // wait X
+        bayFree.release();     // signal Y
 
-        // cutHair
-        print("Barber starts to cut hair");
+        // washCar
+        print("Attendant starts washing a car");
         this_thread::sleep_for(chrono::seconds(1));
-        print("Barber stops to cut hair");
+        print("Attendant finishes washing");
 
         // rendezvous 2
-        customerDone.acquire(); // wait X'
-        barberDone.release();   // signal Y'
+        carWashed.acquire();   // wait X'
+        washingDone.release(); // signal Y'
     }
 }
 
 
 int main()
 {
-    print("Barbershop opening with " << N << " chairs");
-    thread barberThread(barberProcedure);
-    vector<thread> clients {};
+    print("Car wash opening with " << N << " waiting spaces");
+    thread attendantThread(attendant);
+    vector<thread> cars {};
     for(size_t i = 0; i < N+1; ++i)
     {
-        thread t(client, i);
-        clients.push_back(std::move(t));
+        thread t(car, i);
+        cars.push_back(std::move(t));
     }
 
-    barber_thread.join();
-    for (auto &client: clients) {
-        client.join();
+    attendantThread.join();
+    for (auto &car: cars) {
+        car.join();
     }
 
     return 0;
