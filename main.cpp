@@ -14,10 +14,10 @@ mutex cout_mutex;
 // GLOBAL VARIABLES
 int carsWaiting = 0;
 mutex mutexCar;
-counting_semaphore carArrived(0);
-counting_semaphore bayFree(0);
-counting_semaphore carWashed(0);
-counting_semaphore washingDone(0);
+binary_semaphore carArrived(0);
+binary_semaphore bayFree(0);
+binary_semaphore carWashed(0);
+binary_semaphore washingDone(0);
 
 void car(size_t id)
 {
